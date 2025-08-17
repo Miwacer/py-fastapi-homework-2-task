@@ -101,10 +101,10 @@ class MovieDetailResponse(MovieCreateResponse):
 
 
 class MovieUpdateRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255) | None
+    name: str = Field(None, min_length=1, max_length=255)
     date: date | None
-    score: float = Field(..., ge=0, le=100) | None
+    score: float = Field(None, ge=0, le=100)
     overview: str | None
-    status: Literal["Released", "Post Production", "In Production"] | None
-    budget: float = Field(..., ge=0) | None
-    revenue: float = Field(..., ge=0) | None
+    status: Literal["Released", "Post Production", "In Production"]
+    budget: float = Field(None, ge=0)
+    revenue: float = Field(None, ge=0)

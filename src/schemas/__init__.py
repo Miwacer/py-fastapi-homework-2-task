@@ -3,5 +3,5 @@ from schemas.movies import (
     MovieCreateRequest,
     MovieCreateResponse,
     MovieDetailResponse,
-    MovieUpdateResponse,
+    MovieUpdateRequest,
 )

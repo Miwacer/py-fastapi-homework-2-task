@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -19,12 +21,21 @@ from schemas import (
     MovieCreateRequest,
     MovieCreateResponse,
     MovieDetailResponse,
-    MovieUpdateResponse
+    MovieUpdateRequest
 )
 
 
 router = APIRouter()
 
+def validate_movie_patch(movie: MovieUpdateRequest):
+    if movie.budget is not None and movie.budget < 0:
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+    if movie.revenue is not None and movie.revenue < 0:
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+    if movie.score is not None and not (0 <= movie.score <= 10):
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+    if movie.status is not None and movie.status not in ["released", "canceled", "in_production"]:
+        raise HTTPException(status_code=400, detail="Invalid input data.")
 
 async def get_or_create_country(db: AsyncSession, country_code: str) -> CountryModel:
     result = await db.execute(
@@ -78,7 +89,7 @@ async def get_movies(
     movies = result.scalars().all()
 
     if not movies:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        raise HTTPException(status_code=404, detail="No movies found.")
 
     total_items = await db.scalar(select(func.count()).select_from(MovieModel))
     total_pages = (total_items + per_page - 1) // per_page
@@ -101,6 +112,17 @@ async def create_movie(
     movie: MovieCreateRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    if (
+        not movie.name
+        or len(movie.name) > 255
+        or movie.budget < 0
+        or movie.revenue < 0
+        or not (0 <= movie.score <= 10)
+        or movie.status not in ["released", "canceled", "in_production"]
+        or movie.release_date > date.today() + timedelta(days=365)
+    ):
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+
     exists = await db.scalar(
         select(MovieModel).where(
             MovieModel.name == movie.name,
@@ -110,7 +132,7 @@ async def create_movie(
     if exists:
         raise HTTPException(
             status_code=409,
-            detail=f"A movie with the name '{movie.name}' and release date '{movie.date}' already exists"
+            detail=f"A movie with the name '{movie.name}' and release date '{movie.date}' already exists."
         )
 
     country = await get_or_create_country(db, movie.country)
@@ -189,32 +211,20 @@ async def delete_movie(
 @router.patch("/movies/{movie_id}/")
 async def update_movie(
         movie_id: int,
-        movie: MovieUpdateResponse,
+        movie: MovieUpdateRequest,
         db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(MovieModel).where(MovieModel.id == movie_id))
     db_movie = result.scalar_one_or_none()
 
     if not db_movie:
-        raise HTTPException(status_code=404, detail="Movie with the given ID was not found.")
+        raise HTTPException(status_code=404, detail="Movie not found.")
 
-    if movie.budget < 0 or movie.revenue < 0:
-        raise HTTPException(status_code=400, detail="Invalid input data.")
+    validate_movie_patch(movie)
 
-    if movie.name:
-        db_movie.name = movie.name
-    if movie.date:
-        db_movie.date = movie.date
-    if movie.score:
-        db_movie.score = movie.score
-    if movie.overview:
-        db_movie.overview = movie.overview
-    if movie.status:
-        db_movie.status = movie.status
-    if movie.budget:
-        db_movie.budget = movie.budget
-    if movie.revenue:
-        db_movie.revenue = movie.revenue
+    update_data = movie.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_movie, key, value)
 
     await db.commit()
     await db.refresh(db_movie)
