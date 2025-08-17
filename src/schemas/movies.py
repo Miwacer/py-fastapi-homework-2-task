@@ -31,8 +31,8 @@ class MovieCreateRequest(BaseModel):
     score: float = Field(..., ge=0, le=100)
     overview: str
     status: Literal["Released", "Post Production", "In Production"]
-    budget: float = Field(..., gt=0)
-    revenue: float = Field(..., gt=0)
+    budget: float = Field(..., ge=0)
+    revenue: float = Field(..., ge=0)
     country: str
     genres: list[str]
     actors: list[str]
@@ -100,11 +100,11 @@ class MovieDetailResponse(MovieCreateResponse):
     pass
 
 
-class MovieUpdateResponse(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
-    date: date
-    score: float = Field(..., ge=0, le=100)
-    overview: str
-    status: Literal["Released", "Post Production", "In Production"]
-    budget: float = Field(..., gt=0)
-    revenue: float = Field(..., gt=0)
+class MovieUpdateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255) | None
+    date: date | None
+    score: float = Field(..., ge=0, le=100) | None
+    overview: str | None
+    status: Literal["Released", "Post Production", "In Production"] | None
+    budget: float = Field(..., ge=0) | None
+    revenue: float = Field(..., ge=0) | None

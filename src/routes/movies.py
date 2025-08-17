@@ -11,7 +11,6 @@ from sqlalchemy import select, func, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
-from sqlalchemy.orm import selectinload
 
 from database import get_db, MovieModel
 from database.models import CountryModel, GenreModel, ActorModel, LanguageModel
@@ -110,8 +109,8 @@ async def create_movie(
     )
     if exists:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Movie '{movie.name}' ({movie.date}) already exists."
+            status_code=409,
+            detail=f"A movie with the name '{movie.name}' and release date '{movie.date}' already exists"
         )
 
     country = await get_or_create_country(db, movie.country)
@@ -146,10 +145,10 @@ async def get_movie(
     result = await db.execute(
         select(MovieModel)
         .options(
-            selectinload(MovieModel.country),
-            selectinload(MovieModel.genres),
-            selectinload(MovieModel.actors),
-            selectinload(MovieModel.languages),
+            joinedload(MovieModel.country),
+            joinedload(MovieModel.genres),
+            joinedload(MovieModel.actors),
+            joinedload(MovieModel.languages),
         )
         .where(MovieModel.id == movie_id)
     )
@@ -169,10 +168,10 @@ async def delete_movie(
     result = await db.execute(
         select(MovieModel)
         .options(
-            selectinload(MovieModel.country),
-            selectinload(MovieModel.genres),
-            selectinload(MovieModel.actors),
-            selectinload(MovieModel.languages),
+            joinedload(MovieModel.country),
+            joinedload(MovieModel.genres),
+            joinedload(MovieModel.actors),
+            joinedload(MovieModel.languages),
         )
         .where(MovieModel.id == movie_id)
     )
@@ -199,14 +198,24 @@ async def update_movie(
     if not db_movie:
         raise HTTPException(status_code=404, detail="Movie with the given ID was not found.")
 
-    db_movie.name = movie.name
-    db_movie.date = movie.date
-    db_movie.score = movie.score
-    db_movie.overview = movie.overview
-    db_movie.status = movie.status
-    db_movie.budget = movie.budget
-    db_movie.revenue = movie.revenue
+    if movie.budget < 0 or movie.revenue < 0:
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+
+    if movie.name:
+        db_movie.name = movie.name
+    if movie.date:
+        db_movie.date = movie.date
+    if movie.score:
+        db_movie.score = movie.score
+    if movie.overview:
+        db_movie.overview = movie.overview
+    if movie.status:
+        db_movie.status = movie.status
+    if movie.budget:
+        db_movie.budget = movie.budget
+    if movie.revenue:
+        db_movie.revenue = movie.revenue
 
     await db.commit()
     await db.refresh(db_movie)
-    return {"detail": "Movie updated successfully."}
+    return { "message": "Movie updated successfully." }
